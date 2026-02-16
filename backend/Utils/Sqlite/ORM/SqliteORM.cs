@@ -1,5 +1,7 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
 using System.Text;
 
@@ -7,12 +9,18 @@ namespace Utils.Sqlite.ORM
 {
     public class SqliteORM<T> : IDisposable where T : SqliteRow
     {
+        private readonly ILogger<SqliteORM<T>> log;
+
         private readonly SqliteConnection connection;
         private bool initCheck = false;
         private bool disposedValue;
 
-        public SqliteORM(string path)
+        public SqliteORM(string path, ILogger<SqliteORM<T>>? logger = null)
         {
+            // TODO WESD figure out how to make the application automatically pass the correct logger in when calling normally?
+            // or just more generically fill to use library's logger?
+            log = logger ?? NullLogger<SqliteORM<T>>.Instance;
+
             var dir = Path.GetDirectoryName(path);
             if (dir == null) throw new Exception("Unable to get directory from path: " + path);
             Directory.CreateDirectory(dir);
@@ -25,7 +33,6 @@ namespace Utils.Sqlite.ORM
         public IEnumerable<T> Get(string filter, object? args = null)
         {
             CheckInit();
-            // TODO WESD change to user dapper SQL builder? (see nuget dependency)
             var tableName = GetTableName();
             var sql = new StringBuilder();
             sql.AppendLine($"select *");
@@ -33,6 +40,20 @@ namespace Utils.Sqlite.ORM
             sql.AppendLine($"where {filter}");
             var cmd = new CommandDefinition(sql.ToString(), args);
             return connection.Query<T>(cmd).ToArray();
+
+            // TODO WESD test alternate out
+            //// 1. Create the builder
+            //var builder = new SqlBuilder();
+
+            //var tableName = GetTableName();
+            //var template = builder.AddTemplate($"select * from {tableName} /**where**/");
+
+            //if (!string.IsNullOrWhiteSpace(filter))
+            //{
+            //    builder.Where(filter, args);
+            //}
+            //var cmd = new CommandDefinition(template.RawSql, template.Parameters);
+            //return connection.Query<T>(cmd).ToArray();
         }
 
         /// <summary>
@@ -55,6 +76,8 @@ namespace Utils.Sqlite.ORM
             var valIdx = 0;
             foreach (var val in values)
             {
+                if (valIdx > 0) sql.AppendLine(",");
+
                 var paramNames = new List<string>();
                 foreach (var col in cols)
                 {
@@ -62,9 +85,11 @@ namespace Utils.Sqlite.ORM
                     args[param] = col.GetSqlValue(val);
                     paramNames.Add(param);
                 }
-                sql.AppendLine($"({string.Join(", ", paramNames)})");
+                sql.Append($"({string.Join(", ", paramNames)})");
                 valIdx++;
             }
+            sql.AppendLine();
+
             var uniqueKeyCols = cols.Where(x => x.Attribute.UniqueKey == SqliteUniqueKey.UniqueKey).ToArray();
             if (uniqueKeyCols.Length > 0)
             {
@@ -87,7 +112,7 @@ namespace Utils.Sqlite.ORM
         /// </summary>
         public void Upsert(T value)
         {
-            Upsert(new T[] { value });
+            Upsert([value]);
         }
 
         /// <summary>
