@@ -6,9 +6,9 @@ namespace MtgManager.API
     [Route("[controller]")]
     public class ImportDecksController : ControllerBase
     {
-        private readonly ILogger<APIController> _logger;
+        private readonly ILogger<ImportDecksController> _logger;
 
-        public ImportDecksController(ILogger<APIController> logger)
+        public ImportDecksController(ILogger<ImportDecksController> logger)
         {
             _logger = logger;
         }
