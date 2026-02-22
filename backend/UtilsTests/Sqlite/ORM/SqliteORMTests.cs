@@ -183,6 +183,105 @@ namespace UtilsTests.Sqlite.ORM
             Should.Throw<SqliteException>(() => ORM.Get("NON_EXISTENT_COLUMN = 1"));
         }
 
+        [TestMethod]
+        public void Delete_ByValues_ShouldRemoveSpecifiedRow()
+        {
+            var rows = _fixture.CreateMany<TestRow>(3).ToList();
+            ORM.Upsert(rows);
+            var targetRow = rows[0];
+
+            ORM.Delete(targetRow);
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(2);
+            result.ShouldNotContain(x => x.TestUniqueString == targetRow.TestUniqueString);
+        }
+
+        [TestMethod]
+        public void Delete_ByValues_ShouldRemoveMultipleRows()
+        {
+            var rows = _fixture.CreateMany<TestRow>(5).ToList();
+            ORM.Upsert(rows);
+            var targetsToRemove = rows.Take(3).ToList();
+
+            ORM.Delete(targetsToRemove);
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(2);
+            foreach (var target in targetsToRemove)
+            {
+                result.ShouldNotContain(x => x.TestUniqueString == target.TestUniqueString);
+            }
+        }
+
+        [TestMethod]
+        public void Delete_ByValues_DoesNothing_WhenListIsEmpty()
+        {
+            var rows = _fixture.CreateMany<TestRow>(2).ToList();
+            ORM.Upsert(rows);
+
+            ORM.Delete(Enumerable.Empty<TestRow>());
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(2);
+        }
+
+        [TestMethod]
+        public void Delete_ByValues_DoesNothing_WhenKeysDoNotExist()
+        {
+            var existingRows = _fixture.CreateMany<TestRow>(2).ToList();
+            ORM.Upsert(existingRows);
+            var nonExistentRow = _fixture.Create<TestRow>();
+
+            ORM.Delete(nonExistentRow);
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(2);
+        }
+
+        [TestMethod]
+        public void Delete_ByFilter_ShouldRemoveMatchingRow()
+        {
+            var rows = _fixture.CreateMany<TestRow>(3).ToList();
+            ORM.Upsert(rows);
+            var targetRow = rows.First();
+
+            ORM.Delete("TestUniqueString = @val", new { val = targetRow.TestUniqueString });
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(2);
+            result.ShouldNotContain(x => x.TestUniqueString == targetRow.TestUniqueString);
+        }
+
+        [TestMethod]
+        public void Delete_ByFilter_ShouldRemoveMultipleMatchingRows()
+        {
+            var rows = _fixture.CreateMany<TestRow>(5).ToList();
+            var targetInt = 9999;
+            rows[0].TestInt = targetInt;
+            rows[1].TestInt = targetInt;
+            ORM.Upsert(rows);
+
+            ORM.Delete("TestInt = @val", new { val = targetInt });
+
+            var result = ORM.Get("1=1").ToList();
+            result.Count.ShouldBe(3);
+            result.ShouldNotContain(x => x.TestInt == targetInt);
+        }
+
+        [TestMethod]
+        public void Delete_ByFilter_ThrowsArgumentException_OnEmptyFilter()
+        {
+            Should.Throw<ArgumentException>(() => ORM.Delete(""));
+            Should.Throw<ArgumentException>(() => ORM.Delete("   "));
+        }
+
+        [TestMethod]
+        public void Delete_ByFilter_ThrowsSqliteException_OnInvalidSyntax()
+        {
+            Should.Throw<SqliteException>(() => ORM.Delete("NON_EXISTENT_COLUMN = 1"));
+        }
+
         [TestCleanup]
         public void Cleanup()
         {

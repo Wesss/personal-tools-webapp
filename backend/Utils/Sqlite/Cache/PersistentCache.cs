@@ -6,8 +6,6 @@ namespace Utils.Sqlite.Cache
 {
     public class PersistentCache : IDisposable
     {
-        //private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
-
         private readonly SqliteORM<CacheRow> cacheORM;
 
         private bool disposedValue;

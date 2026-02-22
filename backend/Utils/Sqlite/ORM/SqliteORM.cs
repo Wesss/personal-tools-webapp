@@ -40,20 +40,6 @@ namespace Utils.Sqlite.ORM
             sql.AppendLine($"where {filter}");
             var cmd = new CommandDefinition(sql.ToString(), args);
             return connection.Query<T>(cmd).ToArray();
-
-            // TODO WESD test alternate out
-            //// 1. Create the builder
-            //var builder = new SqlBuilder();
-
-            //var tableName = GetTableName();
-            //var template = builder.AddTemplate($"select * from {tableName} /**where**/");
-
-            //if (!string.IsNullOrWhiteSpace(filter))
-            //{
-            //    builder.Where(filter, args);
-            //}
-            //var cmd = new CommandDefinition(template.RawSql, template.Parameters);
-            //return connection.Query<T>(cmd).ToArray();
         }
 
         /// <summary>
@@ -106,10 +92,7 @@ namespace Utils.Sqlite.ORM
             connection.Execute(cmd);
         }
 
-        /// <summary>
-        /// Inserts values if given values have null primary key id or given primary keys don't exist in db.
-        /// If primary key id exists, db is updated to match given value.
-        /// </summary>
+        /// <inheritdoc cref="Upsert(IEnumerable{T})"/>
         public void Upsert(T value)
         {
             Upsert([value]);
@@ -122,16 +105,76 @@ namespace Utils.Sqlite.ORM
         public void Delete(IEnumerable<T> values)
         {
             CheckInit();
-            throw new NotImplementedException("TODO WESD");
+
+            if (values == null || !values.Any()) return;
+
+            var tableName = GetTableName();
+            var cols = GetSqliteColumns();
+            var uniqueKeyCols = cols.Where(x => x.Attribute.UniqueKey == SqliteUniqueKey.UniqueKey).ToArray();
+
+            // Ensure we have a unique key to match against to avoid accidentally deleting everything
+            if (uniqueKeyCols.Length == 0)
+            {
+                throw new InvalidOperationException($"Cannot safely delete from {tableName}: No properties marked with SqliteUniqueKey.UniqueKey.");
+            }
+
+            var sql = new StringBuilder();
+            var args = new Dictionary<string, object>();
+
+            sql.AppendLine($"delete from {tableName}");
+            sql.Append("where ");
+
+            var valIdx = 0;
+            var orConditions = new List<string>();
+
+            foreach (var val in values)
+            {
+                var andConditions = new List<string>();
+                foreach (var col in uniqueKeyCols)
+                {
+                    var paramName = $"@{col.GetColName()}_{valIdx}";
+                    args[paramName] = col.GetSqlValue(val);
+                    andConditions.Add($"{col.GetColName()} = {paramName}");
+                }
+
+                // Groups the unique keys for a single object together (e.g., (Key1 = @Key1_0 AND Key2 = @Key2_0))
+                orConditions.Add($"({string.Join(" and ", andConditions)})");
+                valIdx++;
+            }
+
+            // Joins the objects with OR to execute a single batch delete
+            sql.Append(string.Join("\r\n  or ", orConditions));
+
+            var cmd = new CommandDefinition(sql.ToString(), new DynamicParameters(args), flags: CommandFlags.NoCache);
+            connection.Execute(cmd);
+        }
+
+        /// <inheritdoc cref="Delete(IEnumerable{T})"/>
+        public void Delete(T value)
+        {
+            Delete([value]);
         }
 
         /// <summary>
         /// Deletes values matching the given filter.
         /// </summary>
-        public void Delete(string filter)
+        public void Delete(string filter, object? args = null)
         {
             CheckInit();
-            throw new NotImplementedException("TODO WESD");
+
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                throw new ArgumentException("Filter cannot be null or whitespace. To delete all records, use an explicit filter like '1=1'.", nameof(filter));
+            }
+
+            var tableName = GetTableName();
+            var sql = new StringBuilder();
+
+            sql.AppendLine($"delete from {tableName}");
+            sql.AppendLine($"where {filter}");
+
+            var cmd = new CommandDefinition(sql.ToString(), args);
+            connection.Execute(cmd);
         }
 
         /// <summary>
