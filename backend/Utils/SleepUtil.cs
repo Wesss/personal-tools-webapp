@@ -1,4 +1,4 @@
-﻿namespace TimeUtils
+﻿namespace Utils
 {
     public class SleepUtil
     {

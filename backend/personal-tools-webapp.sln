@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MtgManager", "MtgManager\Mt
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utils", "Utils\Utils.csproj", "{36174B1C-C72D-4901-A5F2-DC6A6160F65A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UtilsTests", "UtilsTests\UtilsTests.csproj", "{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utils.Tests", "UtilsTests\Utils.Tests.csproj", "{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

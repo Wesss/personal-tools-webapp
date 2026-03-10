@@ -10,6 +10,6 @@ namespace Utils.Sqlite.Cache
         [SqliteColumn(SqliteColumnType.Text, SqliteNull.NotNull)]
         public string? CacheVal { get; set; }
         [SqliteColumn(SqliteColumnType.DateTime)]
-        public DateTime? DateSet { get; set; }
+        public DateTime? DateSetUTC { get; set; }
     }
 }

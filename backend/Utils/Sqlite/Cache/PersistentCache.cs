@@ -1,18 +1,76 @@
 ﻿using Dapper;
-using System.Collections.Generic;
+using System.IO;
 using Utils.Sqlite.ORM;
 
 namespace Utils.Sqlite.Cache
 {
     public class PersistentCache : IDisposable
     {
-        private readonly SqliteORM<CacheRow> cacheORM;
+        private readonly ISqliteORM<CacheRow> cacheORM;
+        private readonly ISqliteORM<SettingsRow> settingsORM;
+        private readonly TimeProvider timeProvider;
+        private TimeSpan cacheMaxAge;
+        private DateTime lastMaintenance = DateTime.MinValue;
+        private readonly object maintenanceLock = new object();
 
         private bool disposedValue;
 
-        public PersistentCache(string path, string group)
+        public static PersistentCache Get(string path, string group, TimeSpan cacheMaxAge = default)
         {
-            cacheORM = new SqliteORM<CacheRow>(Path.Combine(path, $"PersistentCache-{group}.sqlite"));
+            var dbPath = Path.Combine(path, $"PersistentCache-{group}.sqlite");
+            var cacheORM = SqliteORM<CacheRow>.Get(dbPath);
+            var settingsORM = SqliteORM<SettingsRow>.Get(dbPath);
+            
+            return new PersistentCache(
+                cacheORM,
+                settingsORM,
+                TimeProvider.System
+            );
+        }
+
+        public PersistentCache(
+            ISqliteORM<CacheRow> cacheORM,
+            ISqliteORM<SettingsRow> settingsORM,
+            TimeProvider timeProvider,
+            TimeSpan? cacheMaxAge = null
+        )
+        {
+            this.cacheORM = cacheORM;
+            this.settingsORM = settingsORM;
+            this.timeProvider = timeProvider;
+            this.cacheMaxAge = cacheMaxAge ?? TimeSpan.FromDays(30);
+        }
+
+        /// <summary>
+        /// Check to run routine mainetnance
+        /// </summary>
+        public void CheckRunMaintenance()
+        {
+            var now = timeProvider.GetUtcNow().DateTime;
+
+            if ((now - lastMaintenance) < cacheMaxAge) return;
+
+            lock (maintenanceLock)
+            {
+                var lastMaintRow = settingsORM.Get("SettingKey = 'LastMaintenance'").FirstOrDefault();
+                if (lastMaintRow != null && DateTime.TryParse(lastMaintRow.SettingVal, out DateTime parsedMaint))
+                {
+                    lastMaintenance = parsedMaint;
+                }
+
+                if ((now - lastMaintenance) < cacheMaxAge) return;
+
+                var cutoffDate = now.Subtract(cacheMaxAge);
+                cacheORM.Delete("DateSet < @cutoff", new { cutoff = cutoffDate });
+                cacheORM.Vacuum();
+
+                lastMaintenance = now;
+                settingsORM.Upsert(new SettingsRow
+                {
+                    SettingKey = "LastMaintenance",
+                    SettingVal = now.ToString("O")
+                });
+            }
         }
 
         /// <summary>
@@ -24,14 +82,13 @@ namespace Utils.Sqlite.Cache
         /// </param>
         public string? Get(string key, int? maxAgeSeconds)
         {
-            // TODO WESD somehow remove out really old keys once in a while? VACCUM the database too while we're at it?
             var args = new Dictionary<string, object>();
             var filter = $"{nameof(CacheRow.CacheKey)} = @key";
             args["@key"] = key;
             if (maxAgeSeconds.HasValue)
             {
-                filter += $" and {nameof(CacheRow.DateSet)} >= @dateSet";
-                args["@dateSet"] = DateTime.Now.AddSeconds(-1 * maxAgeSeconds.Value);
+                filter += $" and {nameof(CacheRow.DateSetUTC)} >= @dateSet";
+                args["@dateSet"] = timeProvider.GetUtcNow().DateTime.AddSeconds(-1 * maxAgeSeconds.Value);
             }
             var row = cacheORM.Get(filter, new DynamicParameters(args)).FirstOrDefault();
             return row?.CacheVal;
@@ -43,10 +100,12 @@ namespace Utils.Sqlite.Cache
         public void Set(string key, string value)
         {
             if (value == null) throw new ArgumentNullException(nameof(value));
+            CheckRunMaintenance();
+
             var upsert = new CacheRow();
             upsert.CacheKey = key;
             upsert.CacheVal = value;
-            upsert.DateSet = DateTime.Now;
+            upsert.DateSetUTC = timeProvider.GetUtcNow().DateTime;
             cacheORM.Upsert(upsert);
         }
 

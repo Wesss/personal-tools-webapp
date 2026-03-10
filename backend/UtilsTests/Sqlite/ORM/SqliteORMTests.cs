@@ -1,12 +1,7 @@
 using AutoFixture;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shouldly;
-using System;
-using System.IO;
-using System.Linq;
 using Utils.Sqlite.ORM;
 
 namespace UtilsTests.Sqlite.ORM
@@ -46,6 +41,7 @@ namespace UtilsTests.Sqlite.ORM
             _dbPath = Path.Combine(Path.GetTempPath(), $"test_db_{Guid.NewGuid()}.sqlite");
             ORM = new SqliteORM<TestRow>(_dbPath, _logger);
         }
+
         private static void SeedFixture(IFixture fixture, int seed)
         {
             var random = new Random(seed);

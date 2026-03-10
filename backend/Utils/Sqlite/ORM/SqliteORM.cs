@@ -1,13 +1,27 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.IO;
 using System.Reflection;
 using System.Text;
+using Utils.Logging;
 
 namespace Utils.Sqlite.ORM
 {
-    public class SqliteORM<T> : IDisposable where T : SqliteRow
+    public interface ISqliteORM<T> : IDisposable where T : SqliteRow
+    {
+        IEnumerable<T> Get(string filter, object? args = null);
+        void Upsert(IEnumerable<T> values);
+        void Upsert(T value);
+        void Delete(IEnumerable<T> values);
+        void Delete(T value);
+        void Delete(string filter, object? args = null);
+        void Vacuum();
+    }
+
+    public class SqliteORM<T> : ISqliteORM<T> where T : SqliteRow
     {
         private readonly ILogger<SqliteORM<T>> log;
 
@@ -15,11 +29,15 @@ namespace Utils.Sqlite.ORM
         private bool initCheck = false;
         private bool disposedValue;
 
-        public SqliteORM(string path, ILogger<SqliteORM<T>>? logger = null)
+        public static SqliteORM<T> Get(string path)
         {
-            // TODO WESD figure out how to make the application automatically pass the correct logger in when calling normally?
-            // or just more generically fill to use library's logger?
-            log = logger ?? NullLogger<SqliteORM<T>>.Instance;
+            var log = GlobalLogger.Get<SqliteORM<T>>();
+            return new SqliteORM<T>(path, log);
+        }
+
+        public SqliteORM(string path, ILogger<SqliteORM<T>> logger)
+        {
+            log = logger;
 
             var dir = Path.GetDirectoryName(path);
             if (dir == null) throw new Exception("Unable to get directory from path: " + path);
@@ -175,6 +193,20 @@ namespace Utils.Sqlite.ORM
 
             var cmd = new CommandDefinition(sql.ToString(), args);
             connection.Execute(cmd);
+        }
+
+        /// <summary>
+        /// Rebuilds the database file, repacking it into a minimal amount of disk space.
+        /// This reclaims space left behind by deleted cache rows.
+        /// </summary>
+        public void Vacuum()
+        {
+            CheckInit();
+
+            log.LogInformation("Running VACUUM on database...");
+            var cmd = new CommandDefinition("VACUUM;", flags: CommandFlags.NoCache);
+            connection.Execute(cmd);
+            log.LogInformation("VACUUM complete.");
         }
 
         /// <summary>
