@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utils", "Utils\Utils.csproj
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utils.Tests", "UtilsTests\Utils.Tests.csproj", "{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MtgManager.Tests", "MtgManagerTests\MtgManager.Tests.csproj", "{D2BD79DC-6866-5641-B6AD-DE33944FE0D6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E4192C4C-0DB7-4CA5-BC48-B178AECCD8B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2BD79DC-6866-5641-B6AD-DE33944FE0D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2BD79DC-6866-5641-B6AD-DE33944FE0D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2BD79DC-6866-5641-B6AD-DE33944FE0D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2BD79DC-6866-5641-B6AD-DE33944FE0D6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

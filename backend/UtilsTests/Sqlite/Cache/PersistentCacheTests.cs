@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using AutoFixture;
-using AutoFixture.AutoMoq;
 using Dapper;
 using Moq;
 using Shouldly;
-using Utils.Sqlite.Cache;
 using Utils.Sqlite.ORM;
 
 namespace Utils.Sqlite.Cache.Tests
@@ -14,7 +8,6 @@ namespace Utils.Sqlite.Cache.Tests
     [TestClass]
     public class PersistentCacheTests
     {
-        private readonly IFixture _fixture;
         private readonly Mock<ISqliteORM<CacheRow>> _cacheOrmMock;
         private readonly Mock<ISqliteORM<SettingsRow>> _settingsOrmMock;
         private readonly Mock<TimeProvider> _timeProviderMock;
@@ -22,12 +15,9 @@ namespace Utils.Sqlite.Cache.Tests
 
         public PersistentCacheTests()
         {
-            // TODO WESD let's get rid of auto fixture, I don't think the complexity/unreadability is worth the convenience
-            _fixture = new Fixture().Customize(new AutoMoqCustomization());
-
-            _cacheOrmMock = _fixture.Freeze<Mock<ISqliteORM<CacheRow>>>();
-            _settingsOrmMock = _fixture.Freeze<Mock<ISqliteORM<SettingsRow>>>();
-            _timeProviderMock = _fixture.Freeze<Mock<TimeProvider>>();
+            _cacheOrmMock = new Mock<ISqliteORM<CacheRow>>();
+            _settingsOrmMock = new Mock<ISqliteORM<SettingsRow>>();
+            _timeProviderMock = new Mock<TimeProvider>();
 
             // Freeze time for consistent testing
             _currentTime = new DateTimeOffset(2026, 3, 9, 12, 0, 0, TimeSpan.Zero);
@@ -48,7 +38,7 @@ namespace Utils.Sqlite.Cache.Tests
         public void Set_WhenValueIsNull_ThrowsArgumentNullException()
         {
             var testObj = CreateTestObj();
-            var key = _fixture.Create<string>();
+            var key = "test_key";
 
             Should.Throw<ArgumentNullException>(() => testObj.Set(key, null!));
         }
@@ -57,8 +47,8 @@ namespace Utils.Sqlite.Cache.Tests
         public void Set_WithValidData_UpsertsToCache()
         {
             var testObj = CreateTestObj();
-            var key = _fixture.Create<string>();
-            var value = _fixture.Create<string>();
+            var key = "test_key";
+            var value = "test_value";
 
             testObj.Set(key, value);
 
@@ -78,8 +68,13 @@ namespace Utils.Sqlite.Cache.Tests
         public void Get_WhenKeyExists_ReturnsValue()
         {
             var testObj = CreateTestObj();
-            var key = _fixture.Create<string>();
-            var expectedRow = _fixture.Create<CacheRow>();
+            var key = "test_key";
+            var expectedRow = new CacheRow
+            {
+                CacheKey = key,
+                CacheVal = "expected_cache_value",
+                DateSetUTC = _currentTime.DateTime
+            };
 
             _cacheOrmMock.Setup(x => x.Get(It.IsAny<string>(), It.IsAny<DynamicParameters>()))
                 .Returns(new List<CacheRow> { expectedRow });
@@ -93,7 +88,7 @@ namespace Utils.Sqlite.Cache.Tests
         public void Get_WhenKeyDoesNotExist_ReturnsNull()
         {
             var testObj = CreateTestObj();
-            var key = _fixture.Create<string>();
+            var key = "missing_key";
 
             _cacheOrmMock.Setup(x => x.Get(It.IsAny<string>(), It.IsAny<DynamicParameters>()))
                 .Returns(new List<CacheRow>());

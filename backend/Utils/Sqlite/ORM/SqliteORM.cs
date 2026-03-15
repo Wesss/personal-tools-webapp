@@ -1,9 +1,6 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using System.IO;
 using System.Reflection;
 using System.Text;
 using Utils.Logging;

@@ -1,4 +1,3 @@
-using AutoFixture;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Shouldly;
@@ -29,25 +28,24 @@ namespace UtilsTests.Sqlite.ORM
 
         private readonly ILogger<SqliteORM<TestRow>> _logger;
         private readonly string _dbPath;
-        private readonly Fixture _fixture;
-        private const int ConstantSeed = 42;
         private readonly SqliteORM<TestRow> ORM;
 
         public SqliteORMTests()
         {
             _logger = new MSTestLogger<SqliteORM<TestRow>>(msg => TestContext?.WriteLine(msg));
-            _fixture = new Fixture();
-            SeedFixture(_fixture, ConstantSeed);
             _dbPath = Path.Combine(Path.GetTempPath(), $"test_db_{Guid.NewGuid()}.sqlite");
             ORM = new SqliteORM<TestRow>(_dbPath, _logger);
         }
 
-        private static void SeedFixture(IFixture fixture, int seed)
+        private static TestRow CreateRow(int seed = 1) => new TestRow
         {
-            var random = new Random(seed);
-            fixture.Customize<int>(c => c.FromFactory(() => random.Next(1, 10000)));
-            fixture.Customize<string>(c => c.FromFactory(() => $"String_{random.Next(1000, 9999)}"));
-        }
+            TestString = $"String_{seed}",
+            TestInt = 1000 + seed,
+            TestUniqueString = $"Unique_{seed}_{Guid.NewGuid()}"
+        };
+
+        private static List<TestRow> CreateRows(int count) =>
+            Enumerable.Range(1, count).Select(CreateRow).ToList();
 
         [TestMethod]
         public void Get_InitializesDatabaseAndTable()
@@ -68,7 +66,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Get_ShouldReturnEmpty_WhenNoMatchesFound()
         {
-            var row = _fixture.Create<TestRow>();
+            var row = CreateRow();
             ORM.Upsert(row);
 
             var result = ORM.Get("TestString = 'NonExistentValue'");
@@ -80,9 +78,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Upsert_ShouldInsertNewRow_WhenTableIsEmpty()
         {
-            var row = _fixture.Build<TestRow>()
-                              .Without(x => x.TestTableId)
-                              .Create();
+            var row = CreateRow();
 
             ORM.Upsert(row);
 
@@ -100,16 +96,19 @@ namespace UtilsTests.Sqlite.ORM
         public void Upsert_ShouldUpdateExistingRow_WhenUniqueKeyConflicts()
         {
             var uniqueKey = "common-key";
-            var originalRow = _fixture.Build<TestRow>()
-                .Without(x => x.TestTableId)
-                .With(x => x.TestUniqueString, uniqueKey)
-                .With(x => x.TestInt, 100)
-                .Create();
-            var updatedRow = _fixture.Build<TestRow>()
-                .Without(x => x.TestTableId)
-                .With(x => x.TestUniqueString, uniqueKey) // Same key to trigger conflict
-                .With(x => x.TestInt, 999) // Changed value
-                .Create();
+            var originalRow = new TestRow
+            {
+                TestUniqueString = uniqueKey,
+                TestInt = 100,
+                TestString = "Original String"
+            };
+
+            var updatedRow = new TestRow
+            {
+                TestUniqueString = uniqueKey, // Same key to trigger conflict
+                TestInt = 999, // Changed value
+                TestString = "Updated String"
+            };
 
             ORM.Upsert(originalRow);
             ORM.Upsert(updatedRow);
@@ -123,10 +122,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Upsert_Bulk_ShouldInsertMultipleRows()
         {
-            var rows = _fixture.Build<TestRow>()
-                .Without(x => x.TestTableId)
-                .CreateMany(5)
-                .ToList();
+            var rows = CreateRows(5);
 
             ORM.Upsert(rows);
 
@@ -137,7 +133,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Get_ReturnsAllRecords_OnTrueFilter()
         {
-            var rows = _fixture.CreateMany<TestRow>(3).ToList();
+            var rows = CreateRows(3);
             ORM.Upsert(rows);
 
             var result = ORM.Get("1=1");
@@ -149,8 +145,8 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Get_FiltersCorrectly_WithSimpleClause()
         {
-            var target = _fixture.Create<TestRow>();
-            var others = _fixture.CreateMany<TestRow>(2).ToList();
+            var target = CreateRow(99);
+            var others = CreateRows(2);
             ORM.Upsert(new[] { target }.Concat(others));
 
             var result = ORM.Get("TestString = @val", new { val = target.TestString });
@@ -162,10 +158,10 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Get_HandlesSqlParameters_WithSpecialCharacters()
         {
-            var row = _fixture.Build<TestRow>()
-                .With(x => x.TestString, "Data'With;Quotes")
-                .Create();
-            ORM.Upsert(new[] { row });
+            var row = CreateRow();
+            row.TestString = "Data'With;Quotes";
+
+            ORM.Upsert(row);
 
             var result = ORM.Get("TestString = @val", new { val = row.TestString });
 
@@ -182,7 +178,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByValues_ShouldRemoveSpecifiedRow()
         {
-            var rows = _fixture.CreateMany<TestRow>(3).ToList();
+            var rows = CreateRows(3);
             ORM.Upsert(rows);
             var targetRow = rows[0];
 
@@ -196,7 +192,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByValues_ShouldRemoveMultipleRows()
         {
-            var rows = _fixture.CreateMany<TestRow>(5).ToList();
+            var rows = CreateRows(5);
             ORM.Upsert(rows);
             var targetsToRemove = rows.Take(3).ToList();
 
@@ -213,7 +209,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByValues_DoesNothing_WhenListIsEmpty()
         {
-            var rows = _fixture.CreateMany<TestRow>(2).ToList();
+            var rows = CreateRows(2);
             ORM.Upsert(rows);
 
             ORM.Delete(Enumerable.Empty<TestRow>());
@@ -225,9 +221,11 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByValues_DoesNothing_WhenKeysDoNotExist()
         {
-            var existingRows = _fixture.CreateMany<TestRow>(2).ToList();
+            var existingRows = CreateRows(2);
             ORM.Upsert(existingRows);
-            var nonExistentRow = _fixture.Create<TestRow>();
+
+            // Create a completely new row that was never inserted
+            var nonExistentRow = CreateRow(99);
 
             ORM.Delete(nonExistentRow);
 
@@ -238,7 +236,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByFilter_ShouldRemoveMatchingRow()
         {
-            var rows = _fixture.CreateMany<TestRow>(3).ToList();
+            var rows = CreateRows(3);
             ORM.Upsert(rows);
             var targetRow = rows.First();
 
@@ -252,7 +250,7 @@ namespace UtilsTests.Sqlite.ORM
         [TestMethod]
         public void Delete_ByFilter_ShouldRemoveMultipleMatchingRows()
         {
-            var rows = _fixture.CreateMany<TestRow>(5).ToList();
+            var rows = CreateRows(5);
             var targetInt = 9999;
             rows[0].TestInt = targetInt;
             rows[1].TestInt = targetInt;

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Utils.Logging;
+using Utils.Sqlite.ORM;
 
 namespace MtgManager.API
 {
@@ -6,22 +8,73 @@ namespace MtgManager.API
     [Route("[controller]")]
     public class ImportDecksController : ControllerBase
     {
-        private readonly ILogger<ImportDecksController> _logger;
+        private const string SqlitePath = @"D:\PersonalToolsWebapp\MtgManager.sqlite";
+        private readonly ILogger<ImportDecksController> _log;
+        private readonly ISqliteORM<ArchidektUserRecord> _orm;
 
-        public ImportDecksController(ILogger<ImportDecksController> logger)
+        public ImportDecksController() : this(
+            SqliteORM<ArchidektUserRecord>.Get(SqlitePath),
+            GlobalLogger.LoggerFactory.CreateLogger<ImportDecksController>()
+        )
         {
-            _logger = logger;
         }
 
-        [HttpPost]
-        public JsonResult Post([FromBody] string deckText)
+        public ImportDecksController(ISqliteORM<ArchidektUserRecord> orm, ILogger<ImportDecksController> log)
         {
-            if (string.IsNullOrEmpty(deckText))
+            _orm = orm;
+            _log = log;
+        }
+
+        [HttpGet]
+        public JsonResult ArchidektUser()
+        {
+            try
             {
-                // TODO WESD return some kind of error
+                var record = _orm.Get("Id = 1").FirstOrDefault();
+                return new JsonResult(record?.Username);
             }
-            var rand = new Random();
-            return new JsonResult(deckText + rand.Next(0, 10));
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to retrieve Archidekt user.");
+                return new JsonResult(null) { StatusCode = 500 };
+            }
         }
+
+        [HttpPut]
+        public JsonResult ArchidektUser([FromQuery] string user)
+        {
+            if (string.IsNullOrWhiteSpace(user))
+            {
+                return new JsonResult(new { error = "User cannot be empty." }) { StatusCode = 400 };
+            }
+
+            try
+            {
+                var record = new ArchidektUserRecord
+                {
+                    Id = 1,
+                    Username = user
+                };
+
+                _orm.Upsert(record);
+                return new JsonResult(new { success = true, user = record.Username });
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to save Archidekt user.");
+                return new JsonResult(new { error = "Failed to save user." }) { StatusCode = 500 };
+            }
+        }
+    }
+
+    [SqliteTable("ArchidektSettings")]
+    public class ArchidektUserRecord : SqliteRow
+    {
+        // Enforce a unique key so Upsert always targets the same record
+        [SqliteColumn(SqliteColumnType.Integer, SqliteNull.NotNull, SqliteUniqueKey.UniqueKey)]
+        public int Id { get; set; }
+
+        [SqliteColumn(SqliteColumnType.Text, SqliteNull.NotNull)]
+        public string Username { get; set; } = string.Empty;
     }
 }
