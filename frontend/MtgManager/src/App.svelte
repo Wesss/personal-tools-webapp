@@ -1,11 +1,9 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
   import ImportDecks from './page/ImportDecks.svelte'
-  import ApiTest from './page/ApiTest.svelte'
 
   const menuDict: { [key: string]: Component } = {
     "ImportDecks" : ImportDecks,
-    "ApiTest" : ApiTest
   };
 
 	let activePage : Component = menuDict["ImportDecks"];

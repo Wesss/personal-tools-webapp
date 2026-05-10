@@ -5,21 +5,21 @@ using Utils.Sqlite.ORM;
 namespace MtgManager.API
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("[controller]/[action]")]
     public class ImportDecksController : ControllerBase
     {
         private const string SqlitePath = @"D:\PersonalToolsWebapp\MtgManager.sqlite";
         private readonly ILogger<ImportDecksController> _log;
-        private readonly ISqliteORM<ArchidektUserRecord> _orm;
+        private readonly ISqliteORM<ArchidektUser> _orm;
 
         public ImportDecksController() : this(
-            SqliteORM<ArchidektUserRecord>.Get(SqlitePath),
+            SqliteORM<ArchidektUser>.Get(SqlitePath),
             GlobalLogger.LoggerFactory.CreateLogger<ImportDecksController>()
         )
         {
         }
 
-        public ImportDecksController(ISqliteORM<ArchidektUserRecord> orm, ILogger<ImportDecksController> log)
+        internal ImportDecksController(ISqliteORM<ArchidektUser> orm, ILogger<ImportDecksController> log)
         {
             _orm = orm;
             _log = log;
@@ -40,41 +40,34 @@ namespace MtgManager.API
             }
         }
 
-        [HttpPut]
-        public JsonResult ArchidektUser([FromQuery] string user)
+        [HttpPost]
+        public JsonResult ListDecks([FromBody] string user)
         {
             if (string.IsNullOrWhiteSpace(user))
             {
                 return new JsonResult(new { error = "User cannot be empty." }) { StatusCode = 400 };
             }
 
+            // TODO AI move this into a helper method, have helper method throw exception if saving failed. Don't catch it here, just allow it to propagate to user.
             try
             {
-                var record = new ArchidektUserRecord
+                var record = new ArchidektUser
                 {
                     Id = 1,
                     Username = user
                 };
 
                 _orm.Upsert(record);
-                return new JsonResult(new { success = true, user = record.Username });
             }
             catch (Exception ex)
             {
                 _log.LogError(ex, "Failed to save Archidekt user.");
                 return new JsonResult(new { error = "Failed to save user." }) { StatusCode = 500 };
             }
+
+            // TODO AI scrape the user's archidekt page (as ArchidektDeck models), check if collection is present, and return this info.
+            // this doesn't need to be persisted yet; but it does need to be serialized to user.
+            return new JsonResult(new {}) { StatusCode = 200 };
         }
-    }
-
-    [SqliteTable("ArchidektSettings")]
-    public class ArchidektUserRecord : SqliteRow
-    {
-        // Enforce a unique key so Upsert always targets the same record
-        [SqliteColumn(SqliteColumnType.Integer, SqliteNull.NotNull, SqliteUniqueKey.UniqueKey)]
-        public int Id { get; set; }
-
-        [SqliteColumn(SqliteColumnType.Text, SqliteNull.NotNull)]
-        public string Username { get; set; } = string.Empty;
     }
 }
