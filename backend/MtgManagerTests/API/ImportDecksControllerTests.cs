@@ -46,24 +46,23 @@ namespace MtgManager.Tests
         }
 
         [TestMethod]
-        public void ArchidektUser_Put_SavesUserSuccessfully()
+        public void ListDecks_SavesUserSuccessfully()
         {
             string newUsername = "Liliana";
 
-            var result = _controller.ArchidektUser(newUsername);
+            var result = _controller.ListDecks(newUsername);
 
             _mockOrm.Verify(x => x.Upsert(It.Is<ArchidektUser>(r =>
                 r.Id == 1 && r.Username == newUsername)), Times.Once);
 
             var jsonResult = result.ShouldBeOfType<JsonResult>();
-            jsonResult.Value.ShouldNotBeNull();
-            jsonResult.Value!.ToString()!.ShouldContain("success = True");
+            jsonResult.StatusCode.ShouldBe(200);
         }
 
         [TestMethod]
-        public void ArchidektUser_Put_ReturnsErrorOnEmptyInput()
+        public void ListDecks_ReturnsErrorOnEmptyInput()
         {
-            var result = _controller.ArchidektUser("");
+            var result = _controller.ListDecks("");
 
             var jsonResult = result.ShouldBeOfType<JsonResult>();
             jsonResult.StatusCode.ShouldBe(400);

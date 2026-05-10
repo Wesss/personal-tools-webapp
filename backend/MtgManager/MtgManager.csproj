@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="MtgManager.Tests" />
     <ProjectReference Include="..\Utils\Utils.csproj" />
   </ItemGroup>
 
